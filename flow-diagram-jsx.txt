@@ -1,0 +1,162 @@
+import { useEffect, useRef, useState } from 'react'
+
+// Map N8N node type suffixes → colour + icon
+const NODE_STYLES = {
+  webhook:     { color: '#6c5ce7', icon: '⚡' },
+  emailSend:   { color: '#00b894', icon: '✉' },
+  slack:       { color: '#e17055', icon: '💬' },
+  httpRequest: { color: '#0984e3', icon: '🌐' },
+  set:         { color: '#fdcb6e', icon: '✏' },
+  if:          { color: '#fd79a8', icon: '⬡' },
+  merge:       { color: '#a29bfe', icon: '⊕' },
+  default:     { color: '#636e72', icon: '◎' },
+}
+
+function getStyle(type = '') {
+  const key = type.split('.').pop()
+  return NODE_STYLES[key] ?? NODE_STYLES.default
+}
+
+const NODE_W = 160
+const NODE_H = 60
+const CANVAS_PAD = 60
+
+export default function FlowDiagram({ parsedFlow }) {
+  const svgRef = useRef()
+  const [viewBox, setViewBox] = useState('0 0 800 400')
+  const [zoom, setZoom] = useState(1)
+
+  const nodes  = parsedFlow?.nodes ?? []
+  const conns  = parsedFlow?.connections ?? {}
+
+  // Build edges from n8n connection format
+  const edges = []
+  for (const [srcName, srcData] of Object.entries(conns)) {
+    const src = nodes.find(n => n.name === srcName)
+    if (!src) continue
+    for (const outputs of Object.values(srcData)) {
+      for (const branch of outputs) {
+        for (const conn of branch) {
+          const tgt = nodes.find(n => n.name === conn.node)
+          if (tgt) edges.push({ src, tgt })
+        }
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!nodes.length) return
+    const xs = nodes.map(n => n.position?.[0] ?? 0)
+    const ys = nodes.map(n => n.position?.[1] ?? 0)
+    const minX = Math.min(...xs) - CANVAS_PAD
+    const minY = Math.min(...ys) - CANVAS_PAD
+    const maxX = Math.max(...xs) + NODE_W + CANVAS_PAD
+    const maxY = Math.max(...ys) + NODE_H + CANVAS_PAD
+    setViewBox(`${minX} ${minY} ${maxX - minX} ${maxY - minY}`)
+  }, [parsedFlow])
+
+  if (!parsedFlow) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+        <span className="text-5xl opacity-30">⬡</span>
+        <p className="text-sm">No flow loaded — paste your JSON in the Input tab first.</p>
+      </div>
+    )
+  }
+
+  if (!nodes.length) {
+    return (
+      <div className="h-full flex items-center justify-center text-slate-500 text-sm">
+        Flow has no nodes to display.
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-4 py-2 border-b border-surface-600 bg-surface-800 text-xs text-slate-400">
+        <span>{nodes.length} nodes · {edges.length} connections</span>
+        <div className="ml-auto flex items-center gap-1">
+          <button onClick={() => setZoom(z => Math.max(0.3, z - 0.1))} className="px-2 py-0.5 rounded bg-surface-600 hover:bg-surface-500">−</button>
+          <span className="w-12 text-center">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => setZoom(z => Math.min(2, z + 0.1))} className="px-2 py-0.5 rounded bg-surface-600 hover:bg-surface-500">+</button>
+          <button onClick={() => setZoom(1)} className="px-2 py-0.5 rounded bg-surface-600 hover:bg-surface-500 ml-1">Reset</button>
+        </div>
+      </div>
+
+      {/* SVG canvas */}
+      <div className="flex-1 overflow-auto bg-surface-900 relative">
+        {/* Grid background */}
+        <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#2d3347" strokeWidth="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+        </svg>
+
+        <svg
+          ref={svgRef}
+          viewBox={viewBox}
+          style={{ width: `${zoom * 100}%`, minHeight: '100%' }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#4a5568" />
+            </marker>
+          </defs>
+
+          {/* Edges */}
+          {edges.map((e, i) => {
+            const sx = (e.src.position?.[0] ?? 0) + NODE_W
+            const sy = (e.src.position?.[1] ?? 0) + NODE_H / 2
+            const tx = (e.tgt.position?.[0] ?? 0)
+            const ty = (e.tgt.position?.[1] ?? 0) + NODE_H / 2
+            const cx = (sx + tx) / 2
+            return (
+              <path
+                key={i}
+                d={`M${sx},${sy} C${cx},${sy} ${cx},${ty} ${tx},${ty}`}
+                fill="none"
+                stroke="#4a5568"
+                strokeWidth="1.5"
+                strokeDasharray="0"
+                markerEnd="url(#arrow)"
+              />
+            )
+          })}
+
+          {/* Nodes */}
+          {nodes.map(node => {
+            const x = node.position?.[0] ?? 0
+            const y = node.position?.[1] ?? 0
+            const { color, icon } = getStyle(node.type)
+            return (
+              <g key={node.id ?? node.name} transform={`translate(${x},${y})`}>
+                {/* Shadow */}
+                <rect x="2" y="4" width={NODE_W} height={NODE_H} rx="10" fill="black" opacity="0.4" />
+                {/* Card */}
+                <rect width={NODE_W} height={NODE_H} rx="10" fill="#1a1f2b" stroke={color} strokeWidth="1.5" />
+                {/* Left accent */}
+                <rect width="4" height={NODE_H} rx="2" fill={color} />
+                {/* Icon bg */}
+                <rect x="10" y="14" width="32" height="32" rx="8" fill={color} opacity="0.18" />
+                <text x="26" y="35" textAnchor="middle" fontSize="16" dominantBaseline="middle">{icon}</text>
+                {/* Name */}
+                <text x="52" y="24" fontSize="10" fill="#94a3b8" fontFamily="Inter,sans-serif" fontWeight="500">
+                  {(node.type ?? '').split('.').pop()}
+                </text>
+                <text x="52" y="40" fontSize="12" fill="#e2e8f0" fontFamily="Inter,sans-serif" fontWeight="600">
+                  {node.name?.length > 16 ? node.name.slice(0, 14) + '…' : node.name}
+                </text>
+              </g>
+            )
+          })}
+        </svg>
+      </div>
+    </div>
+  )
+}

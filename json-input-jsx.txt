@@ -1,0 +1,119 @@
+import { useRef, useState } from 'react'
+
+const PLACEHOLDER = `{
+  "name": "My N8N Flow",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [100, 200]
+    },
+    {
+      "id": "2",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [400, 200]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{ "node": "Send Email", "type": "main", "index": 0 }]]
+    }
+  }
+}`
+
+export default function JsonInputPanel({ flowJson, setFlowJson }) {
+  const fileRef  = useRef()
+  const [dragging, setDragging] = useState(false)
+  const isValid  = flowJson.trim() !== ''
+  let jsonError  = null
+  if (isValid) {
+    try { JSON.parse(flowJson) } catch (e) { jsonError = e.message }
+  }
+
+  const handleFile = (file) => {
+    if (!file) return
+    const r = new FileReader()
+    r.onload = (e) => setFlowJson(e.target.result)
+    r.readAsText(file)
+  }
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDragging(false)
+    handleFile(e.dataTransfer.files[0])
+  }
+
+  const handlePaste = (e) => {
+    const text = e.clipboardData.getData('text')
+    if (text) { e.preventDefault(); setFlowJson(text) }
+  }
+
+  return (
+    <div className="h-full flex flex-col p-6 gap-4 overflow-auto">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-100">Import N8N Flow</h2>
+        <p className="text-sm text-slate-400 mt-0.5">Paste your exported JSON or upload the file directly.</p>
+      </div>
+
+      {/* Upload zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => fileRef.current.click()}
+        className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed py-8 cursor-pointer transition-all
+          ${dragging ? 'border-brand-400 bg-brand-500/10' : 'border-surface-500 hover:border-surface-400 bg-surface-800'}`}
+      >
+        <span className="text-3xl">⬆</span>
+        <p className="text-sm text-slate-400">Drag & drop a <code className="text-brand-400">.json</code> file, or <span className="text-brand-400 underline">browse</span></p>
+        <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={e => handleFile(e.target.files[0])} />
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        <hr className="flex-1 border-surface-600" /> OR <hr className="flex-1 border-surface-600" />
+      </div>
+
+      {/* Textarea */}
+      <div className={`flex-1 flex flex-col rounded-xl border bg-surface-800 glow-focus min-h-64 overflow-hidden
+        ${jsonError ? 'border-danger/60' : 'border-surface-600'}`}>
+        {/* Textarea header */}
+        <div className="flex items-center justify-between px-4 py-2 border-b border-surface-600">
+          <span className="text-xs text-slate-400 font-mono">flow.json</span>
+          <div className="flex items-center gap-2">
+            {jsonError && <span className="text-xs text-red-400">⚠ {jsonError}</span>}
+            {isValid && !jsonError && <span className="text-xs text-success">✓ Valid JSON</span>}
+            {flowJson && (
+              <button onClick={() => setFlowJson('')} className="text-xs text-slate-500 hover:text-red-400 transition-colors">
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        <textarea
+          className="json-textarea flex-1 p-4"
+          value={flowJson}
+          onChange={e => setFlowJson(e.target.value)}
+          onPaste={handlePaste}
+          placeholder={PLACEHOLDER}
+          spellCheck={false}
+        />
+      </div>
+
+      {/* Stats bar */}
+      {isValid && !jsonError && (() => {
+        let p; try { p = JSON.parse(flowJson) } catch { return null }
+        const nodes = p.nodes?.length ?? 0
+        const conns = Object.keys(p.connections ?? {}).length
+        return (
+          <div className="flex gap-4 text-xs text-slate-400">
+            {p.name && <span>Flow: <span className="text-slate-200 font-medium">{p.name}</span></span>}
+            <span>Nodes: <span className="text-accent-400 font-medium">{nodes}</span></span>
+            <span>Connections: <span className="text-accent-400 font-medium">{conns}</span></span>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}

@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: #0d0f14;
+  color: #e2e8f0;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #13161e; }
+::-webkit-scrollbar-thumb { background: #2d3347; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #6c5ce7; }
+
+/* Code / JSON textarea */
+.json-textarea {
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+  resize: none;
+  outline: none;
+  width: 100%;
+  background: transparent;
+  color: #a8b5cc;
+  line-height: 1.6;
+}
+
+/* Glow on focus */
+.glow-focus:focus-within {
+  box-shadow: 0 0 0 2px #6c5ce7;
+}
+
+/* Node card */
+.node-card {
+  position: absolute;
+  cursor: grab;
+  user-select: none;
+}
+.node-card:active { cursor: grabbing; }
+
+/* Prose editor */
+.doc-editor {
+  outline: none;
+  min-height: 100%;
+  line-height: 1.8;
+  color: #cbd5e1;
+}
+.doc-editor h1 { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; margin: 0 0 .5rem; }
+.doc-editor h2 { font-size: 1.15rem; font-weight: 600; color: #e2e8f0; margin: 1.2rem 0 .4rem; }
+.doc-editor p  { margin: 0 0 .75rem; }
+.doc-editor code {
+  background: #1a1f2b;
+  border: 1px solid #2d3347;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: 'Fira Code', monospace;
+  font-size: .8em;
+  color: #7c6af7;
+}
+
+/* Animated pulse for loading */
+@keyframes shimmer {
+  0% { opacity: .4; }
+  50% { opacity: .8; }
+  100% { opacity: .4; }
+}
+.shimmer { animation: shimmer 1.6s ease-in-out infinite; }

@@ -1,0 +1,15 @@
+n8n-flow-documenter/
+├── index.html
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+└── src/
+    ├── main.jsx
+    ├── App.jsx
+    ├── index.css
+    └── components/
+        ├── Sidebar.jsx
+        ├── JsonInputPanel.jsx
+        ├── FlowDiagram.jsx
+        └── DocEditor.jsx

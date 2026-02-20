@@ -1,0 +1,115 @@
+import { useState } from 'react'
+import Sidebar from './components/Sidebar.jsx'
+import JsonInputPanel from './components/JsonInputPanel.jsx'
+import FlowDiagram from './components/FlowDiagram.jsx'
+import DocEditor from './components/DocEditor.jsx'
+
+// ── Demo stub: simulates what the backend will eventually return ──
+const MOCK_DOC = `<h1>Customer Onboarding Automation</h1>
+<p>This flow is triggered by a <code>Webhook</code> event from the CRM system whenever a new customer signs up. It orchestrates the full onboarding sequence across multiple services.</p>
+<h2>Step-by-step breakdown</h2>
+<p><strong>1. Webhook Trigger</strong> — Receives a POST payload containing <code>customer_id</code>, <code>email</code>, and <code>plan_type</code>.</p>
+<p><strong>2. Enrich Customer Data</strong> — Calls the internal <code>/api/customers/:id</code> endpoint to fetch full profile data including billing address and subscription tier.</p>
+<p><strong>3. Send Welcome Email</strong> — Uses the SendGrid node to dispatch a personalised welcome email using the <code>onboarding_v2</code> template.</p>
+<p><strong>4. Create Jira Ticket</strong> — Opens a customer-success ticket in the <code>CS</code> project with priority based on <code>plan_type</code>.</p>
+<p><strong>5. Notify Slack</strong> — Posts a summary card to <code>#new-customers</code> so the CS team is instantly aware.</p>
+<h2>Error handling</h2>
+<p>If the enrichment step fails, the flow retries twice with a 30-second back-off. On persistent failure, a fallback branch sends an alert to <code>#ops-alerts</code> and halts execution.</p>
+<h2>Business impact</h2>
+<p>Eliminates ~4 hours/week of manual onboarding work. Ensures every new customer receives a welcome email within 2 minutes of signup.</p>`
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('input')  // 'input' | 'diagram' | 'docs'
+  const [flowJson, setFlowJson]   = useState('')
+  const [parsedFlow, setParsedFlow] = useState(null)
+  const [docHtml, setDocHtml]     = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [notification, setNotification] = useState(null)
+
+  const notify = (msg, type = 'success') => {
+    setNotification({ msg, type })
+    setTimeout(() => setNotification(null), 3500)
+  }
+
+  // Simulate AI generation (replace with real API call later)
+  const handleGenerate = () => {
+    let parsed
+    try {
+      parsed = JSON.parse(flowJson)
+    } catch {
+      notify('Invalid JSON — please check your input.', 'error')
+      return
+    }
+    setParsedFlow(parsed)
+    setIsGenerating(true)
+    setActiveTab('docs')
+    setTimeout(() => {
+      setDocHtml(MOCK_DOC)
+      setIsGenerating(false)
+      notify('Documentation generated successfully!')
+    }, 2200)
+  }
+
+  const handleJsonLoaded = (json) => {
+    setFlowJson(json)
+    let parsed
+    try { parsed = JSON.parse(json); setParsedFlow(parsed) } catch {}
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-surface-900">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-6 py-3 border-b border-surface-600 bg-surface-800">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-widest">N8N Flow Documenter</span>
+            {parsedFlow?.name && (
+              <span className="px-2 py-0.5 rounded-full text-xs bg-brand-500/20 text-brand-400 border border-brand-500/30">
+                {parsedFlow.name}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab === 'input' && (
+              <button
+                onClick={handleGenerate}
+                disabled={!flowJson.trim()}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium bg-brand-500 hover:bg-brand-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                <span>✦</span> Generate Docs
+              </button>
+            )}
+            {activeTab === 'docs' && docHtml && (
+              <button
+                onClick={() => notify('Confluence publishing coming soon!', 'info')}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium bg-accent-500 hover:bg-accent-400 transition-colors"
+              >
+                <span>⬆</span> Publish to Confluence
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Panel */}
+        <div className="flex-1 overflow-hidden">
+          {activeTab === 'input'   && <JsonInputPanel flowJson={flowJson} setFlowJson={handleJsonLoaded} />}
+          {activeTab === 'diagram' && <FlowDiagram parsedFlow={parsedFlow} />}
+          {activeTab === 'docs'    && <DocEditor docHtml={docHtml} setDocHtml={setDocHtml} isGenerating={isGenerating} />}
+        </div>
+      </main>
+
+      {/* Toast */}
+      {notification && (
+        <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium border transition-all
+          ${notification.type === 'error' ? 'bg-red-950 border-danger text-red-300' :
+            notification.type === 'info'  ? 'bg-blue-950 border-blue-500 text-blue-300' :
+                                            'bg-green-950 border-success text-green-300'}`}>
+          <span>{notification.type === 'error' ? '✕' : notification.type === 'info' ? 'ℹ' : '✓'}</span>
+          {notification.msg}
+        </div>
+      )}
+    </div>
+  )
+}
